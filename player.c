@@ -28,6 +28,11 @@
 #include "timecoder.h"
 
 
+/* minimum movement of the timecode to switch to PLAYER_PLAYING status */
+
+#define PLAYING_DELTA 0.00001
+
+
 /* Bend playback speed to compensate for the difference between our
  * current position and that given by the timecode */
 
@@ -115,6 +120,7 @@ static double build_pcm(signed short *pcm, int samples, int rate,
 
 void player_init(struct player_t *pl)
 {
+    pl->status = PLAYER_STOPPED;
     pl->reconnect = 0;
 
     pl->position = 0.0;
@@ -258,12 +264,18 @@ int player_collect(struct player_t *pl, signed short *pcm,
 
     /* Sync pitch is applied post-filtering */
 
-    pl->position += build_pcm(pcm, samples, rate,
+    double seconds = build_pcm(pcm, samples, rate,
 			      pl->track,
                               pl->position - pl->offset,
                               pl->pitch * pl->sync_pitch,
                               pl->volume, target_volume);
-    
+                              
+    if (fabs(seconds) > PLAYING_DELTA)
+      pl->status = PLAYER_PLAYING;
+    else      
+      pl->status = PLAYER_STOPPED;
+      
+    pl->position += seconds;    
     pl->volume = target_volume;
 
     return 0;

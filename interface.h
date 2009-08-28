@@ -20,12 +20,14 @@
 #ifndef INTERFACE_H
 #define INTERFACE_H
 
+#include <stdbool.h>
 #include "timecoder.h"
 
 #define MAX_PLAYERS 4
 #define MAX_TIMECODERS 4
 
 struct interface_t {
+    bool deck_protection;
     short int players, timecoders;
     
     struct player_t *player[MAX_PLAYERS];

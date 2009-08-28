@@ -94,6 +94,8 @@
 #define SCROLLBAR_SIZE 10
 
 #define METER_WARNING_TIME 20 /* time in seconds for "red waveform" warning */
+#define LOCKED_WARNING_TIME 3000  /* time in milliseconds that elapse until
+                                     "deck locked warning is hidden */
 
 
 /* Function key (F1-F12) definitions */
@@ -140,10 +142,11 @@ TTF_Font *clock_font, *deci_font, *detail_font, *font, *em_font;
 
 SDL_Color background_col = {0, 0, 0, 255},
     text_col = {224, 224, 224, 255},
-    warn_col = {192, 64, 0, 255},
+    warn_col = {192, 64, 0, 255},    
     ok_col = {32, 128, 3, 255},
     elapsed_col = {0, 32, 255, 255},
     remain_col = {0, 0, 64, 255},
+    lock_col = {255, 193, 0, 255},
     cursor_col = {192, 0, 0, 255},
     selected_col = {0, 48, 64, 255},
     detail_col = {128, 128, 128, 255},
@@ -457,10 +460,15 @@ static int draw_font_rect(SDL_Surface *surface, const struct rect_t *rect,
 /* Draw the display of artist name and track name */
 
 static void draw_track_summary(SDL_Surface *surface, const struct rect_t *rect,
-                               struct track_t *track)
+                               struct track_t *track, Uint32 player_lock)
 {
     struct rect_t top, bottom;
 
+    if (player_lock != 0) {
+        draw_font_rect(surface, rect, "DECK LOCKED", clock_font, lock_col, background_col);
+        return;
+    }
+    
     split_top(rect, &top, &bottom, FONT_SPACE, 0);
 
     draw_font_rect(surface, &top, track->artist,
@@ -837,12 +845,13 @@ static void draw_deck_status(SDL_Surface *surface,
     else
         sprintf(buf, "timecode:        ");
     
-    sprintf(buf + 17, "pitch:%+0.2f (sync %0.2f %+.5fs = %+0.2f)  %s",
+    sprintf(buf + 17, "pitch:%+0.2f (sync %0.2f %+.5fs = %+0.2f)  %s status: %s",
             pl->pitch,
             pl->sync_pitch,
             pl->last_difference,
             pl->pitch * pl->sync_pitch,
-            pl->reconnect ? "RECN  " : "");
+            pl->reconnect ? "RECN  " : "",
+            pl->status == PLAYER_PLAYING ? "PLAYING" : "STOPPED");
     
     draw_font_rect(surface, rect, buf, detail_font,
                    detail_col, background_col);
@@ -852,7 +861,7 @@ static void draw_deck_status(SDL_Surface *surface,
 /* Draw a single deck */
 
 static void draw_deck(SDL_Surface *surface, const struct rect_t *rect,
-                      struct player_t *pl, int meter_scale)
+                      struct player_t *pl, int meter_scale, Uint32 player_lock)
 {
     int position;
     struct rect_t track, top, meters, status, rest, lower;
@@ -863,7 +872,7 @@ static void draw_deck(SDL_Surface *surface, const struct rect_t *rect,
     if(rest.h < 160)
         rest = *rect;
     else
-        draw_track_summary(surface, &track, pl->track);
+        draw_track_summary(surface, &track, pl->track, player_lock);
 
     split_top(&rest, &top, &lower, CLOCK_FONT_SIZE * 2, SPACER);
     if(lower.h < 64)
@@ -885,7 +894,7 @@ static void draw_deck(SDL_Surface *surface, const struct rect_t *rect,
 
 static void draw_decks(SDL_Surface *surface, const struct rect_t *rect,
                        int ndecks, struct player_t **player,
-                       int meter_scale)
+                       int meter_scale, Uint32 player_locks[MAX_PLAYERS])
 {
     int d, deck_width;
     struct rect_t single;
@@ -897,7 +906,7 @@ static void draw_decks(SDL_Surface *surface, const struct rect_t *rect,
 
     for(d = 0; d < ndecks; d++) {
         single.x = rect->x + (deck_width + BORDER) * d;
-        draw_deck(surface, &single, player[d], meter_scale);
+        draw_deck(surface, &single, player[d], meter_scale, player_locks[d]);
     }
 }
 
@@ -1111,10 +1120,11 @@ static Uint32 ticker(Uint32 interval, void *p)
 void interface_init(struct interface_t *in)
 {
     int n;
-
+    
     for(n = 0; n < MAX_PLAYERS; n++)
         in->player[n] = NULL;
 
+    in->deck_protection = false;
     in->listing = NULL;
 }
 
@@ -1128,6 +1138,7 @@ int interface_run(struct interface_t *in)
         deck, func;
     char search[256];
     const char *status = BANNER;
+    Uint32 player_locks[MAX_PLAYERS];
 
     SDL_Event event;
     SDLKey key;
@@ -1153,6 +1164,9 @@ int interface_run(struct interface_t *in)
     library_lines = 0;
     selected = 0;
     view_offset = 0;
+    
+    for(p = 0; p < MAX_PLAYERS; p++)
+        player_locks[p] = 0;
 
     for(p = 0; p < in->timecoders; p++) {
         if (timecoder_monitor_init(in->timecoder[p], SCOPE_SIZE) == -1)
@@ -1314,8 +1328,19 @@ int interface_run(struct interface_t *in)
                     } else switch(func) {
                         
                     case FUNC_LOAD:
-                        if(selected != -1) 
-                            do_loading(pl->track, results->record[selected]);
+                        if((selected != -1) && (in->deck_protection)) {
+                            if(pl->status != PLAYER_PLAYING) {
+                                do_loading(pl->track,results->record[selected]);
+                                player_locks[deck] = 0;
+                            }
+                            else {
+                                player_locks[deck] = SDL_GetTicks();
+                                fprintf(stderr, "Deck %d is locked!\n", deck);
+                            }
+                            
+                        } else if(selected != -1)
+                            do_loading(pl->track,results->record[selected]);
+                        
                         break;
                         
                     case FUNC_RECUE:
@@ -1421,11 +1446,16 @@ int interface_run(struct interface_t *in)
         if(decks_update >= UPDATE_REDRAW) {
             LOCK(surface);
             draw_decks(surface, &rplayers, in->players, in->player,
-                       meter_scale);
+                       meter_scale, player_locks);
             UNLOCK(surface);
             UPDATE(surface, &rplayers);
             decks_update = UPDATE_NONE;
         }
+
+        for(p = 0; p < MAX_PLAYERS; p++)
+            if (player_locks[p] != 0)
+                if (player_locks[p] + LOCKED_WARNING_TIME < SDL_GetTicks())
+                    player_locks[p] = 0;
 
     } /* main loop */
 
