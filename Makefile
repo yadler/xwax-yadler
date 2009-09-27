@@ -30,8 +30,8 @@ JACK_LIBS = -ljack
 # Core objects and libraries
 
 OBJS = interface.o library.o listing.o lut.o player.o pitch.o rig.o \
-	timecoder.o track.o xwax.o
-DEVICE_OBJS = device.o
+	selector.o timecoder.o track.o xwax.o
+DEVICE_OBJS = device.o oss.o
 DEVICE_CPPFLAGS =
 DEVICE_LIBS =
 

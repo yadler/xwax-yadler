@@ -27,7 +27,7 @@
 
 struct interface_t {
     short int players, timecoders;
-    
+
     struct player_t *player[MAX_PLAYERS];
     struct timecoder_t *timecoder[MAX_TIMECODERS];
     struct listing_t *listing;
