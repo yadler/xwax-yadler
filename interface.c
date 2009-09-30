@@ -1023,6 +1023,9 @@ static int draw_listing(SDL_Surface *surface, const struct rect_t *rect,
     box.w = SCROLLBAR_SIZE;
     box.h = h;
 
+    if (box.h < SCROLLBAR_SIZE)
+        box.h = SCROLLBAR_SIZE;
+
     SDL_FillRect(surface, &box, palette(surface, &col));
 
     if(sel->view_listing->entries > 0) {
