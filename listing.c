@@ -87,6 +87,31 @@ int listing_add(struct listing_t *ls, struct record_t *lr)
 }
 
 
+int listing_remove(struct listing_t *ls, struct record_t *lr)
+{
+    int n, pos = -1;
+
+    for(n = 0; n < ls->entries; n++) {
+        if (ls->record[n] == lr) {
+            ls->record[n] = NULL;
+            pos = n;
+        }
+    }
+
+    /* record not in crate! */
+    if (pos == -1)
+        return -1;
+
+    for(n = pos; n < ls->entries - 1; n++) {
+        ls->record[n] = ls->record[n + 1];
+    }
+
+    ls->entries--;
+
+    return 0;
+}
+
+
 static int record_cmp(const struct record_t *a, const struct record_t *b)
 {
     int r;

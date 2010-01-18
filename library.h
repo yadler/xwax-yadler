@@ -25,6 +25,8 @@
 #include "listing.h"
 
 #define CRATE_ALL "All records"
+#define CRATE_PLAYED "Played records"
+#define CRATE_LOADED "Loaded records"
 
 struct crate_t {
     bool is_fixed;
@@ -43,6 +45,8 @@ void library_clear(struct library_t *li);
 struct crate_t* library_new_crate(struct library_t *lib, char *name,
                                   bool is_fixed);
 struct crate_t* library_get_crate(struct library_t *lib, char *name);
+int crate_add(struct crate_t *crate, struct record_t *lr);
+int crate_rem(struct crate_t* crate, struct record_t *lr);
 int library_import(struct library_t *lib, const char *scan, const char *path);
 
 #endif

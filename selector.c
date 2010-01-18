@@ -335,3 +335,39 @@ void selector_search_refine(struct selector_t *sel, char key)
 
     scroll_set_entries(&sel->records, sel->view_listing->entries);
 }
+
+
+int selector_toggle_status(struct selector_t *sel)
+{
+    if(sel->records.selected < 0)
+        return -1;
+
+    struct record_t* selected = selector_current(sel);
+    if(selected == NULL)
+        return -1;
+
+    switch (selected->status) {
+
+        case RECORD_PLAYED:
+            selected->status = RECORD_LOADED;
+            crate_add(library_get_crate(sel->library, CRATE_LOADED), selected);
+            crate_rem(library_get_crate(sel->library, CRATE_PLAYED), selected);
+            break;
+
+        case RECORD_NOT_PLAYED:
+            selected->status = RECORD_PLAYED;
+            crate_add(library_get_crate(sel->library, CRATE_PLAYED), selected);
+            crate_rem(library_get_crate(sel->library, CRATE_LOADED), selected);
+            break;
+
+        case RECORD_LOADED:
+            selected->status = RECORD_NOT_PLAYED;
+            crate_rem(library_get_crate(sel->library, CRATE_LOADED), selected);
+            crate_rem(library_get_crate(sel->library, CRATE_PLAYED), selected);
+            break;
+    }
+
+    crate_has_changed(sel);
+
+    return 0;
+}

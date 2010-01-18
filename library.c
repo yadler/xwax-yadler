@@ -45,6 +45,8 @@ int library_init(struct library_t *li)
     li->crates = 0;
 
     library_new_crate(li, CRATE_ALL, true);
+    library_new_crate(li, CRATE_PLAYED, true);
+    library_new_crate(li, CRATE_LOADED, true);
 
     return 0;
 }
@@ -172,9 +174,18 @@ struct crate_t* library_get_crate(struct library_t *lib, char *name)
 }
 
 
-static int crate_add(struct crate_t *crate, struct record_t *lr)
+int crate_add(struct crate_t *crate, struct record_t *lr)
 {
     return listing_add(&crate->listing, lr);
+}
+
+
+int crate_rem(struct crate_t* crate, struct record_t *lr)
+{
+    if ((lr != NULL) && (crate != NULL))
+        return listing_remove(&crate->listing, lr);
+
+    return -1;
 }
 
 
@@ -287,6 +298,7 @@ int library_import(struct library_t *li, const char *scan, const char *path)
         }
 
         d->pathname = pathname;
+        d->status = RECORD_NOT_PLAYED;
 
         if (get_field(fp, '\t', &d->artist) != 0) {
             fprintf(stderr, "EOF when reading artist for '%s'.\n", d->pathname);
