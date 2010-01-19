@@ -92,6 +92,7 @@
 #define SCOPE_SIZE (CLOCK_FONT_SIZE * 2 - 6)
 
 #define SCROLLBAR_SIZE 10
+#define SCROLLBAR_POS_MINSIZE 3
 
 #define METER_WARNING_TIME 20 /* time in seconds for "red waveform" warning */
 
@@ -971,9 +972,12 @@ static void draw_scroll_bar(SDL_Surface *surface, const struct rect_t *rect,
 
     if (scroll->entries > 0) {
         box.x = rect->x;
-        box.y = rect->y + rect->h * scroll->offset / scroll->entries;
+        box.y = rect->y + MIN(rect->h - SCROLLBAR_POS_MINSIZE,
+                              rect->h * scroll->offset / scroll->entries);
         box.w = rect->w;
         box.h = rect->h * MIN(scroll->lines, scroll->entries) / scroll->entries;
+        box.h = SCROLLBAR_POS_MINSIZE + rect->h *
+                MIN(scroll->lines, scroll->entries) / scroll->entries;
         SDL_FillRect(surface, &box, palette(surface, &selected_col));
     }
 }
