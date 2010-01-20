@@ -244,6 +244,7 @@ void track_init(struct track_t *tr, const char *importer)
 
     tr->artist = NULL;
     tr->title = NULL;
+    tr->record = NULL;
 
     tr->blocks = 0;
     tr->bytes = 0;
@@ -351,4 +352,42 @@ int track_import(struct track_t *tr, const char *path)
     rig_awaken(tr->rig);
 
     return 0;
+}
+
+
+void track_set_cuepoint(struct track_t *tr, int cuepoint, double position)
+{
+    if ((tr != NULL) && (tr->record != NULL))
+    {
+      tr->record->cuepoints[cuepoint].position = position;
+      tr->record->cuepoints[cuepoint].is_assigned = true;
+    }
+}
+
+
+double track_get_cuepoint(struct track_t *tr, int cuepoint)
+{
+    if ((tr->record != NULL) && (tr->record->cuepoints[cuepoint].is_assigned))
+        return tr->record->cuepoints[cuepoint].position;
+
+    return 0.0;
+}
+
+
+void track_reset_cuepoint(struct track_t *tr, int cuepoint)
+{
+    if (tr->record != NULL)
+    {
+      tr->record->cuepoints[cuepoint].position = 0.0;
+      tr->record->cuepoints[cuepoint].is_assigned = false;
+    }
+}
+
+
+bool track_is_cuepoint_assigned(struct track_t *tr, int cuepoint)
+{
+    if (tr->record != NULL)
+      return tr->record->cuepoints[cuepoint].is_assigned;
+
+    return false;
 }

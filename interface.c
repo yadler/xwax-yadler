@@ -90,6 +90,7 @@
 
 #define SPINNER_SIZE (CLOCK_FONT_SIZE * 2 - 6)
 #define SCOPE_SIZE (CLOCK_FONT_SIZE * 2 - 6)
+#define CUEPOINT_WIDTH 120
 
 #define SCROLLBAR_SIZE 10
 #define SCROLLBAR_POS_MINSIZE 3
@@ -148,6 +149,14 @@ SDL_Color background_col = {0, 0, 0, 255},
     needle_col = {255, 255, 255, 255},
     vinyl_col = {0, 0, 0, 255},
     vinyl_ppm_col = {255, 255, 255, 255};
+
+SDL_Color cue_cols[MAX_CUEPOINTS] = {
+    {255, 255,   0, 255},
+    {  0, 255, 255, 255},
+    {255,   0,   0, 255},
+    {  0,   255, 0, 255},
+    {255,   0, 255, 255}
+};
 
 int spinner_angle[SPINNER_SIZE * SPINNER_SIZE];
 
@@ -624,7 +633,7 @@ static void draw_overview(SDL_Surface *surface, const struct rect_t *rect,
                           struct track_t *tr, int position)
 {
     int x, y, w, h, r, c, sp, fade, bytes_per_pixel, pitch, height,
-        current_position;
+        current_position, i = 0, cp[MAX_CUEPOINTS];;
     Uint8 *pixels, *p;
     SDL_Color col;
 
@@ -637,10 +646,20 @@ static void draw_overview(SDL_Surface *surface, const struct rect_t *rect,
     bytes_per_pixel = surface->format->BytesPerPixel;
     pitch = surface->pitch;
 
-    if (tr->length)
+    /* Calculate relative cue position */
+
+    if(tr->length) {
         current_position = (long long)position * w / tr->length;
-    else
+        for (i = 0; i < MAX_CUEPOINTS; i++) {
+            int cue_position = track_get_cuepoint(tr, i) * tr->rate;
+            cp[i] = (long long)cue_position * w / tr->length;
+        }
+    }
+    else {
         current_position = 0;
+        for (i = 0; i < MAX_CUEPOINTS; i++)
+            cp[i] = -1;
+    }
 
     for (c = 0; c < w; c++) {
 
@@ -669,7 +688,19 @@ static void draw_overview(SDL_Surface *surface, const struct rect_t *rect,
             fade = 3;
         }
 
-        if (track_is_importing(tr)) {
+        for (i = 0; i < MAX_CUEPOINTS; i++) {
+            if( (c == cp[i]) && (track_is_cuepoint_assigned(tr, i)) ) {
+                col = cue_cols[i];
+                fade = 0;
+            }
+        }
+
+        if(c == current_position) {
+            col = needle_col;
+            fade = 1;
+        }
+
+        if(track_is_importing(tr)) {
             col.b >>= 1;
             col.g >>= 1;
             col.r >>= 1;
@@ -710,7 +741,8 @@ static void draw_overview(SDL_Surface *surface, const struct rect_t *rect,
 static void draw_closeup(SDL_Surface *surface, const struct rect_t *rect,
                          struct track_t *tr, int position, int scale)
 {
-    int x, y, w, h, r, c, sp, fade, bytes_per_pixel, pitch, height;
+    int x, y, w, h, r, c, sp, fade, bytes_per_pixel, pitch, height,
+        i = 0, cp[MAX_CUEPOINTS];
     Uint8 *pixels, *p;
     SDL_Color col;
 
@@ -723,7 +755,14 @@ static void draw_closeup(SDL_Surface *surface, const struct rect_t *rect,
     bytes_per_pixel = surface->format->BytesPerPixel;
     pitch = surface->pitch;
 
-    for (c = 0; c < w; c++) {
+    /* Calculate relative cue position */
+
+    for (i = 0; i < MAX_CUEPOINTS; i++) {
+        int cue_position = track_get_cuepoint(tr, i) * tr->rate;
+        cp[i] = cue_position - (cue_position % (1 << scale));
+    }
+
+    for(c = 0; c < w; c++) {
 
         /* Work out the meter height in pixels for this column */
 
@@ -737,12 +776,19 @@ static void draw_closeup(SDL_Surface *surface, const struct rect_t *rect,
 
         /* Select the appropriate colour */
 
-        if (c == w / 2) {
+        col = elapsed_col;
+        fade = 3;
+
+        for (i = 0; i < MAX_CUEPOINTS; i++) {
+            if( (cp[i] == sp) && (track_is_cuepoint_assigned(tr, i)) ) {
+                col = cue_cols[i];
+                fade = 0;
+            }
+        }
+
+        if(c == w / 2) {
             col = needle_col;
             fade = 1;
-        } else {
-            col = elapsed_col;
-            fade = 3;
         }
 
         /* Get a pointer to the top of the column, and increment
@@ -787,33 +833,75 @@ static void draw_meters(SDL_Surface *surface, const struct rect_t *rect,
 }
 
 
+static void draw_cuepoint(SDL_Surface *surface, const struct rect_t *rect,
+                          struct player_t *pl, int cuepoint)
+{
+    char buf[128];
+    char hms[8], deci[8];
+    SDL_Color col = detail_col;
+
+    if (track_is_cuepoint_assigned(pl->track, cuepoint))
+        col = cue_cols[cuepoint%MAX_CUEPOINTS];
+
+    time_to_clock(hms, deci, track_get_cuepoint(pl->track, cuepoint)*1000);
+
+    sprintf(buf, "%d  %s%s", cuepoint+1, hms, deci);
+    draw_font_rect(surface, rect, buf, detail_font, col, background_col);
+}
+
+
+static void draw_cuepoints(SDL_Surface *surface, const struct rect_t *rect,
+                           struct player_t *pl)
+{
+    int i;
+    draw_cuepoint(surface, rect, pl, 0);
+
+    for (i = 0; i <  MAX_CUEPOINTS; i++) {
+        struct rect_t cp_rect;
+
+        cp_rect.x = rect->x;
+        cp_rect.y = rect->y + i * 12;
+        cp_rect.w = rect->w;
+        cp_rect.h = rect->h - i * 12;
+
+        draw_cuepoint(surface, &cp_rect, pl, i);
+    }
+}
+
+
 /* Draw the current playback status -- clocks, spinner and scope */
 
 static void draw_deck_top(SDL_Surface *surface, const struct rect_t *rect,
                           struct player_t *pl)
 {
-    struct rect_t clocks, left, right, spinner, scope;
+    struct rect_t clocks, left, right, middle, cuepoints, spinner, scope;
     
     split_left(rect, &clocks, &right, CLOCKS_WIDTH, SPACER);
 
-    /* If there is no timecoder to display information on, or not enough 
-     * available space, just draw clocks which span the overall space */
+    draw_deck_clocks(surface, &clocks, pl);
+    if (right.w < 0)
+      return;
 
-    if (!pl->timecoder || right.w < 0) {
-        draw_deck_clocks(surface, rect, pl);
+    split_left(&right, &cuepoints, &middle, CUEPOINT_WIDTH, SPACER);
+    if(!pl->timecoder || middle.w < 0) {
+        draw_cuepoints(surface, &right, pl);
         return;
     }
 
-    draw_deck_clocks(surface, &clocks, pl);    
+    draw_cuepoints(surface, &cuepoints, pl);
 
-    split_right(&right, &left, &spinner, SPINNER_SIZE, SPACER);
-    if (left.w < 0)
+    /* Leave now if there is no timecoder to display information */
+    if(!pl->timecoder)
+        return;
+
+    split_right(&middle, &left, &spinner, SPINNER_SIZE, SPACER);
+    if(left.w < 0)
         return;
     split_bottom(&spinner, NULL, &spinner, SPINNER_SIZE, 0);
     draw_spinner(surface, &spinner, pl);
 
-    split_right(&left, &clocks, &scope, SCOPE_SIZE, SPACER);
-    if (clocks.w < 0)
+    split_right(&left, &middle, &scope, SCOPE_SIZE, SPACER);
+    if(clocks.w < 0)
         return;
     split_bottom(&scope, NULL, &scope, SCOPE_SIZE, 0);
     draw_scope(surface, &scope, pl->timecoder);
@@ -1145,6 +1233,21 @@ static void do_loading(struct track_t *track, struct record_t *record)
 
     track->artist = record->artist;
     track->title = record->title;
+    track->record = record;
+}
+
+
+static void jmp_or_rst_cuepoint(struct interface_t *in, int deck, int cuepoint)
+{
+    if(deck < in->players) {
+        if (track_is_cuepoint_assigned(in->player[deck]->track, cuepoint)) {
+            player_jump_to_cuepoint(in->player[deck], cuepoint);
+        }
+        else {
+            track_set_cuepoint(in->player[deck]->track, cuepoint,
+                               player_get_track_position(in->player[deck]));
+        }
+    }
 }
 
 
@@ -1157,11 +1260,13 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
     struct player_t *pl;
     struct record_t* re;
 
-    if (key >= SDLK_a && key <= SDLK_z) {
+    /* TODO: check for better solution (search mode) */
+
+    if((mod & KMOD_SHIFT) && (key >= SDLK_a && key <= SDLK_z)) {
         selector_search_refine(sel, (key - SDLK_a) + 'a');
         return true;
 
-    } else if (key >= SDLK_0 && key <= SDLK_9) {
+    } else if((mod & KMOD_SHIFT) && (key >= SDLK_0 && key <= SDLK_9)) {
         selector_search_refine(sel, (key - SDLK_0) + '0');
         return true;
 
@@ -1209,7 +1314,67 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
         selector_toggle(sel);
         return true;
 
-    } else if ((key == SDLK_EQUALS) || (key == SDLK_PLUS)) {
+    /* Cue point related keys */
+
+    } else if((mod & KMOD_LCTRL) && (key >= SDLK_1 && key <= SDLK_9)) {
+        int cp = (key - SDLK_1) % 5;
+        int deck = (key - SDLK_1) / 5;
+
+        if(deck < in->players)
+            track_reset_cuepoint(in->player[deck]->track, cp);
+
+    } else if(key >= SDLK_1 && key <= SDLK_9) {
+        int cp = (key - SDLK_1) % 5;
+        int deck = (key - SDLK_1) / 5;
+
+        jmp_or_rst_cuepoint(in, deck, cp);
+
+    /* START OF CUE POINT KEY MESS */
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_0))  {
+        if(in->players > 1)
+            track_reset_cuepoint(in->player[1]->track, 4);
+
+    } else if(key == SDLK_0) {
+        jmp_or_rst_cuepoint(in, 1, 4);
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_q)) {
+        if(in->players > 2)
+            track_reset_cuepoint(in->player[2]->track, 0);
+
+    } else if(key == SDLK_q) {
+        jmp_or_rst_cuepoint(in, 2, 0);
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_w)) {
+        if(in->players > 2)
+            track_reset_cuepoint(in->player[2]->track, 1);
+
+    } else if(key == SDLK_w) {
+        jmp_or_rst_cuepoint(in, 2, 1);
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_e)) {
+        if(in->players > 2)
+            track_reset_cuepoint(in->player[2]->track, 2);
+
+    } else if(key == SDLK_e) {
+        jmp_or_rst_cuepoint(in, 2, 2);
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_r)) {
+        if(in->players > 2)
+            track_reset_cuepoint(in->player[2]->track, 3);
+
+    } else if(key == SDLK_r) {
+        jmp_or_rst_cuepoint(in, 2, 3);
+
+    } else if((mod & KMOD_LCTRL) && (key == SDLK_t)) {
+        if(in->players > 2)
+            track_reset_cuepoint(in->player[2]->track, 4);
+
+    } else if(key == SDLK_t) {
+        jmp_or_rst_cuepoint(in, 2, 4);
+
+
+    } else if((key == SDLK_EQUALS) || (key == SDLK_PLUS)) {
         (*meter_scale)--;
 
         if (*meter_scale < 0)

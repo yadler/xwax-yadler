@@ -20,6 +20,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 #include "device.h"
@@ -199,6 +200,22 @@ int player_recue(struct player_t *pl)
 {
     pl->offset = pl->position;
     return 0;
+}
+
+
+/* Jump to a given cuepoint position */
+
+void player_jump_to_cuepoint(struct player_t *pl, int cuepoint)
+{
+    if (track_is_cuepoint_assigned(pl->track, cuepoint))
+        pl->offset = pl->position - track_get_cuepoint(pl->track, cuepoint);
+}
+
+/* Returns the current track position (without offset) */
+
+double player_get_track_position(struct player_t *pl)
+{
+    return pl->position - pl->offset;
 }
 
 

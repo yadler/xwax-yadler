@@ -204,7 +204,7 @@ static int get_field(FILE *fp, char delim, char **f)
 
 int library_import(struct library_t *li, const char *scan, const char *path)
 {
-    int pstdout[2], status;
+    int pstdout[2], status, i;
     char *cratename, *pathname;
     pid_t pid;
     FILE *fp;
@@ -288,7 +288,12 @@ int library_import(struct library_t *li, const char *scan, const char *path)
 
         d->pathname = pathname;
 
-        if (get_field(fp, '\t', &d->artist) != 0) {
+        for(i = 0; i < MAX_CUEPOINTS; i++) {
+            d->cuepoints[i].is_assigned = false;
+            d->cuepoints[i].position = 0.0;
+        }
+
+        if(get_field(fp, '\t', &d->artist) != 0) {
             fprintf(stderr, "EOF when reading artist for '%s'.\n", d->pathname);
             return -1;
         }

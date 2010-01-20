@@ -26,6 +26,7 @@
 #include <sys/types.h>
 
 #include "rig.h"
+#include "listing.h"
 
 #define TRACK_CHANNELS 2
 #define TRACK_RATE 44100
@@ -49,7 +50,8 @@ struct track_t {
     struct rig_t *rig;
 
     /* pointers to external data */
-   
+
+    struct record_t *record; /* record in listing */
     const char *importer, /* path to import script */
         *artist, *title;
     
@@ -71,6 +73,11 @@ int track_pollfd(struct track_t *tr, struct pollfd *pe);
 int track_handle(struct track_t *tr);
 int track_abort(struct track_t *tr);
 int track_wait(struct track_t *tr);
+
+void track_set_cuepoint(struct track_t* tr, int cuepoint, double position);
+double track_get_cuepoint(struct track_t* tr, int cuepoint);
+void track_reset_cuepoint(struct track_t *tr, int cuepoint);
+bool track_is_cuepoint_assigned(struct track_t *tr, int cuepoint);
 
 /* Return true if the track importer is running, otherwise false */
 

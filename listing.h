@@ -20,8 +20,19 @@
 #ifndef LISTING_H
 #define LISTING_H
 
+#include <stdbool.h>
+
+#define MAX_CUEPOINTS 5
+
+struct cuepoint_t {
+    bool is_assigned;
+    double position;
+};
+
 struct record_t {
     char *pathname, *artist, *title;
+    /* Cuepoint data */
+    struct cuepoint_t cuepoints[MAX_CUEPOINTS];
 };
 
 /* Listing points to records, but does not manage those pointers */
