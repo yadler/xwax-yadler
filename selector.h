@@ -27,6 +27,11 @@
 #include "library.h"
 #include "listing.h"
 
+/* input modes */
+
+#define INPUT_CUE_MODE 0
+#define INPUT_SEARCH_MODE 1
+
 /* Managed context of a scrolling window, of a number of fixed-height
  * lines, backed by a list of a known number of entries */
 
@@ -47,6 +52,7 @@ struct selector_t {
 
     size_t search_len;
     char search[256];
+    int input_mode;
 };
 
 void selector_init(struct selector_t *sel, struct library_t *lib);
@@ -70,4 +76,5 @@ void selector_toggle(struct selector_t *sel);
 void selector_search_expand(struct selector_t *sel);
 void selector_search_refine(struct selector_t *sel, char key);
 
+void selector_toggle_mode(struct selector_t *sel);
 #endif

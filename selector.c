@@ -183,6 +183,7 @@ void selector_init(struct selector_t *sel, struct library_t *lib)
     sel->toggled = false;
     sel->search[0] = '\0';
     sel->search_len = 0;
+    sel->input_mode = INPUT_CUE_MODE;
 
     listing_init(&sel->listing_a);
     listing_init(&sel->listing_b);
@@ -334,4 +335,23 @@ void selector_search_refine(struct selector_t *sel, char key)
     sel->swap_listing = tmp;
 
     scroll_set_entries(&sel->records, sel->view_listing->entries);
+}
+
+
+void selector_toggle_mode(struct selector_t *sel)
+{
+    if(sel->input_mode == INPUT_CUE_MODE) {
+        sel->input_mode = INPUT_SEARCH_MODE;
+
+    } else {
+        sel->input_mode = INPUT_CUE_MODE;
+        if(sel->search_len == 0)
+            return;
+
+        sel->search_len = 0;
+        sel->search[0] = '\0';
+
+        (void)listing_match(initial(sel), sel->view_listing, sel->search);
+        scroll_set_entries(&sel->records, sel->view_listing->entries);
+    }
 }

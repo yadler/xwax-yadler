@@ -1205,9 +1205,21 @@ static void draw_library(SDL_Surface *surface, const struct rect_t *rect,
 {
     unsigned int lines;
     struct rect_t rsearch, rlists, rcrates, rrecords;
+    SDL_Rect all;
 
-    split_top(rect, &rsearch, &rlists, SEARCH_HEIGHT, SPACER);
-    draw_search(surface, &rsearch, sel);
+    /* clear the entire library rect, otherwise we've resizing artefacts */
+
+    all.x = rect->x; all.y = rect->y; all.w = rect->w; all.h = rect->h;
+    SDL_FillRect(surface, &all, palette(surface, &background_col));
+
+    if (sel->input_mode == INPUT_SEARCH_MODE)
+    {
+        split_top(rect, &rsearch, &rlists, SEARCH_HEIGHT, SPACER);
+        draw_search(surface, &rsearch, sel);
+
+    } else {
+        split_top(rect, &rsearch, &rlists, 0, SPACER);
+    }
 
     lines = rlists.h / FONT_SPACE;
     selector_set_lines(sel, lines);
@@ -1260,22 +1272,8 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
     struct player_t *pl;
     struct record_t* re;
 
-    /* TODO: check for better solution (search mode) */
-
-    if((mod & KMOD_SHIFT) && (key >= SDLK_a && key <= SDLK_z)) {
-        selector_search_refine(sel, (key - SDLK_a) + 'a');
-        return true;
-
-    } else if((mod & KMOD_SHIFT) && (key >= SDLK_0 && key <= SDLK_9)) {
-        selector_search_refine(sel, (key - SDLK_0) + '0');
-        return true;
-
-    } else if (key == SDLK_SPACE) {
-        selector_search_refine(sel, ' ');
-        return true;
-
-    } else if (key == SDLK_BACKSPACE) {
-        selector_search_expand(sel);
+    if(key == SDLK_INSERT) {
+        selector_toggle_mode(sel);
         return true;
 
     } else if (key == SDLK_HOME) {
@@ -1373,7 +1371,6 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
     } else if(key == SDLK_t) {
         jmp_or_rst_cuepoint(in, 2, 4);
 
-
     } else if((key == SDLK_EQUALS) || (key == SDLK_PLUS)) {
         (*meter_scale)--;
 
@@ -1426,6 +1423,87 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
                 player_connect_timecoder(pl, in->timecoder[deck]);
                 break;
             }
+        }
+
+    } else if (sel->input_mode == INPUT_SEARCH_MODE) {
+
+        if(key >= SDLK_a && key <= SDLK_z) {
+            selector_search_refine(sel, (key - SDLK_a) + 'a');
+            return true;
+
+        } else if(key >= SDLK_0 && key <= SDLK_9) {
+            selector_search_refine(sel, (key - SDLK_0) + '0');
+            return true;
+
+        } else if(key == SDLK_SPACE) {
+            selector_search_refine(sel, ' ');
+            return true;
+
+        } else if(key == SDLK_BACKSPACE) {
+            selector_search_expand(sel);
+            return true;
+        }
+
+    } else if (sel->input_mode == INPUT_CUE_MODE) {
+
+        /* Cue point related keys */
+
+        if((mod & KMOD_LCTRL) && (key >= SDLK_1 && key <= SDLK_9)) {
+            int cp = (key - SDLK_1) % 5;
+            int deck = (key - SDLK_1) / 5;
+
+            if(deck < in->players)
+                track_reset_cuepoint(in->player[deck]->track, cp);
+
+        } else if(key >= SDLK_1 && key <= SDLK_9) {
+            int cp = (key - SDLK_1) % 5;
+            int deck = (key - SDLK_1) / 5;
+
+            jmp_or_rst_cuepoint(in, deck, cp);
+
+        /* START OF CUE POINT KEY MESS */
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_0))  {
+            if(in->players > 1)
+                track_reset_cuepoint(in->player[1]->track, 4);
+
+        } else if(key == SDLK_0) {
+            jmp_or_rst_cuepoint(in, 1, 4);
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_q)) {
+            if(in->players > 2)
+                track_reset_cuepoint(in->player[2]->track, 0);
+
+        } else if(key == SDLK_q) {
+            jmp_or_rst_cuepoint(in, 2, 0);
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_w)) {
+            if(in->players > 2)
+                track_reset_cuepoint(in->player[2]->track, 1);
+
+        } else if(key == SDLK_w) {
+            jmp_or_rst_cuepoint(in, 2, 1);
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_e)) {
+            if(in->players > 2)
+                track_reset_cuepoint(in->player[2]->track, 2);
+
+        } else if(key == SDLK_e) {
+            jmp_or_rst_cuepoint(in, 2, 2);
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_r)) {
+            if(in->players > 2)
+                track_reset_cuepoint(in->player[2]->track, 3);
+
+        } else if(key == SDLK_r) {
+            jmp_or_rst_cuepoint(in, 2, 3);
+
+        } else if((mod & KMOD_LCTRL) && (key == SDLK_t)) {
+            if(in->players > 2)
+                track_reset_cuepoint(in->player[2]->track, 4);
+
+        } else if(key == SDLK_t) {
+            jmp_or_rst_cuepoint(in, 2, 4);
         }
     }
 
