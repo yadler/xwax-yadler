@@ -1312,65 +1312,6 @@ static bool handle_key(struct interface_t *in, struct selector_t *sel,
         selector_toggle(sel);
         return true;
 
-    /* Cue point related keys */
-
-    } else if((mod & KMOD_LCTRL) && (key >= SDLK_1 && key <= SDLK_9)) {
-        int cp = (key - SDLK_1) % 5;
-        int deck = (key - SDLK_1) / 5;
-
-        if(deck < in->players)
-            track_reset_cuepoint(in->player[deck]->track, cp);
-
-    } else if(key >= SDLK_1 && key <= SDLK_9) {
-        int cp = (key - SDLK_1) % 5;
-        int deck = (key - SDLK_1) / 5;
-
-        jmp_or_rst_cuepoint(in, deck, cp);
-
-    /* START OF CUE POINT KEY MESS */
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_0))  {
-        if(in->players > 1)
-            track_reset_cuepoint(in->player[1]->track, 4);
-
-    } else if(key == SDLK_0) {
-        jmp_or_rst_cuepoint(in, 1, 4);
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_q)) {
-        if(in->players > 2)
-            track_reset_cuepoint(in->player[2]->track, 0);
-
-    } else if(key == SDLK_q) {
-        jmp_or_rst_cuepoint(in, 2, 0);
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_w)) {
-        if(in->players > 2)
-            track_reset_cuepoint(in->player[2]->track, 1);
-
-    } else if(key == SDLK_w) {
-        jmp_or_rst_cuepoint(in, 2, 1);
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_e)) {
-        if(in->players > 2)
-            track_reset_cuepoint(in->player[2]->track, 2);
-
-    } else if(key == SDLK_e) {
-        jmp_or_rst_cuepoint(in, 2, 2);
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_r)) {
-        if(in->players > 2)
-            track_reset_cuepoint(in->player[2]->track, 3);
-
-    } else if(key == SDLK_r) {
-        jmp_or_rst_cuepoint(in, 2, 3);
-
-    } else if((mod & KMOD_LCTRL) && (key == SDLK_t)) {
-        if(in->players > 2)
-            track_reset_cuepoint(in->player[2]->track, 4);
-
-    } else if(key == SDLK_t) {
-        jmp_or_rst_cuepoint(in, 2, 4);
-
     } else if((key == SDLK_EQUALS) || (key == SDLK_PLUS)) {
         (*meter_scale)--;
 
